@@ -1,0 +1,19 @@
+# Task → model routing (consumed by app/ai/gateway.py via LiteLLM).
+# Provider swap = config change; nothing outside gateway.py imports an AI SDK.
+model_list:
+  - model_name: bulk          # high-volume, low-stakes (news tagging, filings)
+    litellm_params: { model: deepseek/deepseek-chat }
+  - model_name: interactive   # user-facing analysis & chat
+    litellm_params: { model: anthropic/claude-sonnet-5 }
+  - model_name: free-tier
+    litellm_params: { model: gemini/gemini-2.0-flash }
+
+router_settings:
+  budget: { max_monthly_usd: 20, alert_at_pct: 80 }
+
+task_routing:
+  news_tagging: bulk
+  daily_summary: free-tier
+  chat_assistant: interactive
+  chart_analysis: interactive
+  filing_summary: bulk
