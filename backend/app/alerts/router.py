@@ -1,0 +1,33 @@
+"""Inbound webhooks — TradingView Pro alerts enter the platform here.
+
+Set the alert's webhook URL in TradingView to:
+    https://<backend-host>/alerts/webhooks/tradingview?secret=<WEBHOOK_SECRET>
+and put a JSON message body in the alert, e.g.:
+    {"ticker": "{{ticker}}", "side": "buy", "price": {{close}},
+     "time": "{{timenow}}", "note": "daily RSI>60 setup"}
+
+Events land in public.webhook_events; a worker normalizes them into
+signals/alert_deliveries so TradingView alerts flow through the same
+Telegram + journal pipeline as native scanner signals.
+"""
+
+import hmac
+
+from fastapi import APIRouter, HTTPException, Request, status
+
+from app.core.config import get_settings
+from app.core.deps import DbSession
+
+router = APIRouter()
+
+
+@router.post("/webhooks/tradingview")
+async def tradingview_webhook(request: Request, db: DbSession, secret: str = "") -> dict:
+    settings = get_settings()
+    if not settings.webhook_secret or not hmac.compare_digest(secret, settings.webhook_secret):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Bad webhook secret")
+
+    payload = await request.json()
+    # Phase 1: INSERT INTO webhook_events (source, payload) VALUES ('tradingview', ...)
+    # then notify the dispatcher. Stored raw first so a parsing bug never loses an alert.
+    raise NotImplementedError
