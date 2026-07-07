@@ -12,8 +12,10 @@ Telegram + journal pipeline as native scanner signals.
 """
 
 import hmac
+import json
 
 from fastapi import APIRouter, HTTPException, Request, status
+from sqlalchemy import text
 
 from app.core.config import get_settings
 from app.core.deps import DbSession
@@ -27,7 +29,21 @@ async def tradingview_webhook(request: Request, db: DbSession, secret: str = "")
     if not settings.webhook_secret or not hmac.compare_digest(secret, settings.webhook_secret):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Bad webhook secret")
 
-    payload = await request.json()
-    # Phase 1: INSERT INTO webhook_events (source, payload) VALUES ('tradingview', ...)
-    # then notify the dispatcher. Stored raw first so a parsing bug never loses an alert.
-    raise NotImplementedError
+    # Stored raw first so a parsing bug never loses an alert; a worker (or the
+    # dispatcher) normalizes processed=false rows into alert deliveries.
+    try:
+        payload = await request.json()
+    except json.JSONDecodeError:
+        payload = {"raw": (await request.body()).decode(errors="replace")}
+
+    event_id = (
+        await db.execute(
+            text(
+                "INSERT INTO webhook_events (source, payload) "
+                "VALUES ('tradingview', CAST(:payload AS jsonb)) RETURNING id"
+            ),
+            {"payload": json.dumps(payload)},
+        )
+    ).scalar_one()
+    await db.commit()
+    return {"stored": True, "event_id": event_id}
