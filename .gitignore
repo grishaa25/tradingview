@@ -1,0 +1,27 @@
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Env & secrets
+.env
+.env.local
+.env*.local
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+
+# Misc
+.DS_Store
+.vercel

@@ -1,0 +1,15 @@
+# Supabase CLI config — run `supabase init` locally if you want the full
+# generated file; this minimal one is enough for `supabase db reset` /
+# `supabase link --project-ref <ref>` / `supabase db push`.
+project_id = "tradingview"
+
+[db]
+port = 54322
+major_version = 15
+
+[api]
+port = 54321
+schemas = ["public"]
+
+[auth]
+site_url = "http://localhost:3000"

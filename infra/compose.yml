@@ -1,0 +1,14 @@
+# Local development stack for the backend.
+#   - Database: use the Supabase CLI (`supabase start`) or point DATABASE_URL
+#     at your hosted Supabase project — no Postgres container here.
+#   - Frontend: `npm run dev` in frontend/ (deployed on Vercel).
+services:
+  api:
+    build: ../backend
+    ports: ["8000:8000"]
+    env_file: ../backend/.env
+
+  worker:
+    build: ../backend
+    command: python -m app.workers.scheduler
+    env_file: ../backend/.env
