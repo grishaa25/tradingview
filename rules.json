@@ -1,0 +1,171 @@
+{
+  "meta": {
+    "name": "NSE F&O Dual-Timeframe Momentum Scanner",
+    "version": "1.0",
+    "description": "Momentum-based stock scanner for the NSE Futures & Options universe. Evaluates Daily and 1-Hour timeframes and generates BUY/SELL signals only when ALL conditions for that side are satisfied simultaneously.",
+    "market": "NSE",
+    "segment": "EQUITY_FNO",
+    "exchange_prefix": "NSE:",
+    "created": "2026-07-07"
+  },
+
+  "universe": {
+    "source": "NSE_FNO_UNIVERSE",
+    "description": "All stocks in the NSE Futures & Options segment (complete F&O universe).",
+    "mode": "full",
+    "modes_available": ["full", "top_liquid_50"],
+    "liquidity_filter": {
+      "enabled": false,
+      "description": "Optional filter: restrict the scan to the 50 most liquid F&O stocks ranked by 30-day average daily traded value. Set enabled=true and mode=top_liquid_50 to activate.",
+      "rank_by": "average_traded_value",
+      "lookback_days": 30,
+      "top_n": 50,
+      "refresh_frequency": "daily",
+      "min_avg_traded_value_inr": 250000000
+    },
+    "exclusions": {
+      "ban_period_stocks": true,
+      "description": "Skip stocks currently in the F&O ban period (MWPL > 95%)."
+    }
+  },
+
+  "timeframes": {
+    "higher": {
+      "id": "1D",
+      "label": "Daily",
+      "role": "Trend and momentum confirmation on the daily chart."
+    },
+    "lower": {
+      "id": "60",
+      "label": "1-Hour",
+      "role": "Intraday momentum and trend-location confirmation."
+    },
+    "evaluation": "Both timeframes must be evaluated on every scan pass. A signal requires simultaneous agreement across both."
+  },
+
+  "indicators": [
+    { "name": "RSI", "period": 14, "timeframe": "1D", "id": "rsi_daily" },
+    { "name": "RSI", "period": 14, "timeframe": "60", "id": "rsi_hourly" },
+    { "name": "SMA", "period": 50, "timeframe": "60", "source": "close", "id": "sma50_hourly" }
+  ],
+
+  "signals": {
+    "buy": {
+      "logic": "ALL",
+      "description": "Generate a BUY signal immediately when every condition below is true at the same time.",
+      "conditions": [
+        {
+          "id": "daily_rsi_bullish",
+          "description": "Daily RSI (14) is greater than 60 — strong momentum on the daily timeframe.",
+          "indicator": "rsi_daily",
+          "operator": ">",
+          "value": 60
+        },
+        {
+          "id": "hourly_rsi_bullish",
+          "description": "Hourly RSI (14) is greater than 60 — strong momentum on the 1-hour timeframe.",
+          "indicator": "rsi_hourly",
+          "operator": ">",
+          "value": 60
+        },
+        {
+          "id": "bullish_daily_candle",
+          "description": "Current Daily Close is greater than the Previous Daily Close — confirms a bullish daily candle.",
+          "left": { "timeframe": "1D", "field": "close", "offset": 0 },
+          "operator": ">",
+          "right": { "timeframe": "1D", "field": "close", "offset": 1 }
+        },
+        {
+          "id": "price_above_hourly_sma50",
+          "description": "Current Hourly Price is above the 50-period Simple Moving Average on the 1-hour timeframe.",
+          "left": { "timeframe": "60", "field": "close", "offset": 0 },
+          "operator": ">",
+          "right": { "indicator": "sma50_hourly" }
+        }
+      ],
+      "trigger": {
+        "mode": "immediate",
+        "description": "Fire the BUY signal on the first scan pass where all four conditions are simultaneously true.",
+        "re_arm": "Signal re-arms only after at least one condition turns false, preventing duplicate alerts for the same setup."
+      }
+    },
+
+    "sell": {
+      "logic": "ALL",
+      "description": "Generate a SELL signal immediately when every condition below is true at the same time.",
+      "conditions": [
+        {
+          "id": "daily_rsi_bearish",
+          "description": "Daily RSI (14) is below 45 — weakening momentum on the daily timeframe.",
+          "indicator": "rsi_daily",
+          "operator": "<",
+          "value": 45
+        },
+        {
+          "id": "hourly_rsi_bearish",
+          "description": "Hourly RSI (14) is below 45 — weakening momentum on the 1-hour timeframe.",
+          "indicator": "rsi_hourly",
+          "operator": "<",
+          "value": 45
+        },
+        {
+          "id": "bearish_daily_candle",
+          "description": "Current Daily Close is less than the Previous Daily Close — confirms a bearish daily candle.",
+          "left": { "timeframe": "1D", "field": "close", "offset": 0 },
+          "operator": "<",
+          "right": { "timeframe": "1D", "field": "close", "offset": 1 }
+        },
+        {
+          "id": "price_below_hourly_sma50",
+          "description": "Current Hourly Price is below the 50-period Simple Moving Average on the 1-hour timeframe.",
+          "left": { "timeframe": "60", "field": "close", "offset": 0 },
+          "operator": "<",
+          "right": { "indicator": "sma50_hourly" }
+        }
+      ],
+      "trigger": {
+        "mode": "immediate",
+        "description": "Fire the SELL signal on the first scan pass where all four conditions are simultaneously true.",
+        "re_arm": "Signal re-arms only after at least one condition turns false, preventing duplicate alerts for the same setup."
+      }
+    }
+  },
+
+  "scan": {
+    "schedule": {
+      "market_hours_only": true,
+      "market_open": "09:15",
+      "market_close": "15:30",
+      "timezone": "Asia/Kolkata",
+      "frequency": "on_hourly_candle_close",
+      "description": "Evaluate on every 1-hour candle close during NSE market hours; the daily conditions use the live (forming) daily candle for close-vs-previous-close and the last completed value for Daily RSI context."
+    },
+    "output": {
+      "fields": [
+        "symbol",
+        "signal",
+        "timestamp",
+        "ltp",
+        "rsi_daily",
+        "rsi_hourly",
+        "sma50_hourly",
+        "daily_close",
+        "prev_daily_close",
+        "conditions_snapshot"
+      ],
+      "sort_by": "rsi_daily",
+      "sort_order": "desc",
+      "log_file": "signals.csv"
+    },
+    "reporting": {
+      "on_signal": "Report the symbol, side (BUY/SELL), and the actual value of every condition at trigger time.",
+      "on_no_signal": "Report which condition(s) failed with actual vs required values for any symbol explicitly queried."
+    }
+  },
+
+  "risk": {
+    "note": "Decision-support only. Signals are alerts, not orders. No automatic execution is configured.",
+    "max_risk_per_trade_pct": 1.0,
+    "min_reward_to_risk": 2.0
+  }
+}
