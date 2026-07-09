@@ -1,37 +1,60 @@
 """APScheduler entrypoint — `python -m app.workers.scheduler`.
 
-Job table (docs/ARCHITECTURE.md §6, all times IST):
-  hourly_scan_pass   10:15..15:15 + 15:30   run all enabled scans
-  chain_snapshot     every 5 min, mkt hours option chains → chain_snapshots
-  eod_bhavcopy       18:30 daily            EOD ingest, universe/ban/lot refresh
-  liquidity_rank     19:00 daily            30d avg traded value → top-50 ranks
-  reconcile          19:30 daily            broker vs bhavcopy close check
-  news_poll          every 10 min           RSS fetch + dedupe
-  iv_daily_close     15:35 daily            ATM IV close → iv_history
-  signal_outcomes    19:45 daily            label signals with fwd returns
-
-All jobs must be idempotent and log to public.job_runs.
+Job table (docs/ARCHITECTURE.md §6, all times IST). All jobs are idempotent
+and log to public.job_runs. Weekend/holiday skips happen inside the job
+bodies (jobs.py checks market_holidays).
 """
 
 import asyncio
+import logging
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+
+from app.workers import jobs
 
 IST = "Asia/Kolkata"
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
 
 
 def build_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone=IST)
-    # Jobs are registered here as they ship, e.g.:
-    # scheduler.add_job(jobs.hourly_scan_pass, "cron",
-    #                   day_of_week="mon-fri", hour="10-15", minute=15)
+    # hourly candle closes: 10:15, 11:15, 12:15, 13:15, 14:15, 15:15 + 15:30 close
+    scheduler.add_job(
+        jobs.hourly_scan_pass,
+        CronTrigger(day_of_week="mon-fri", hour="10-15", minute=15, timezone=IST),
+        id="hourly_scan_pass",
+    )
+    scheduler.add_job(
+        jobs.hourly_scan_pass,
+        CronTrigger(day_of_week="mon-fri", hour=15, minute=30, timezone=IST),
+        id="close_scan_pass",
+    )
+    scheduler.add_job(
+        jobs.eod_bhavcopy,
+        CronTrigger(day_of_week="mon-fri", hour=18, minute=30, timezone=IST),
+        id="eod_bhavcopy",
+    )
+    scheduler.add_job(
+        jobs.liquidity_rank,
+        CronTrigger(day_of_week="mon-fri", hour=19, minute=0, timezone=IST),
+        id="liquidity_rank",
+    )
+    scheduler.add_job(
+        jobs.signal_outcomes,
+        CronTrigger(day_of_week="mon-fri", hour=19, minute=45, timezone=IST),
+        id="signal_outcomes",
+    )
     return scheduler
 
 
 async def main() -> None:
     scheduler = build_scheduler()
     scheduler.start()
-    print("worker scheduler started")
+    logging.getLogger(__name__).info(
+        "worker scheduler started: %s", [j.id for j in scheduler.get_jobs()]
+    )
     await asyncio.Event().wait()
 
 

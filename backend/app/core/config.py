@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
 
+    # Inbound webhooks (TradingView Pro alerts). Any long random string.
+    webhook_secret: str = ""
+
     # AI (LiteLLM reads provider keys from the environment)
     ai_monthly_budget_usd: float = 20.0
 
