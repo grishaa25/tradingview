@@ -17,13 +17,19 @@ def create_app() -> FastAPI:
     )
 
     # Routers are mounted as modules ship (docs/ARCHITECTURE.md §2).
+    from app.ai.router import router as ai_router
     from app.alerts.router import router as alerts_router
+    from app.impact.router import router as impact_router
     from app.marketdata.router import router as marketdata_router
+    from app.options.router import router as options_router
     from app.scanner.router import router as scanner_router
 
     app.include_router(marketdata_router, prefix="/marketdata", tags=["marketdata"])
     app.include_router(scanner_router, prefix="/scans", tags=["scanner"])
     app.include_router(alerts_router, prefix="/alerts", tags=["alerts"])
+    app.include_router(options_router, prefix="/options", tags=["options"])
+    app.include_router(impact_router, prefix="/impact", tags=["impact"])
+    app.include_router(ai_router, prefix="/ai", tags=["ai"])
 
     @app.get("/health")
     async def health() -> dict:
