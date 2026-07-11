@@ -60,13 +60,7 @@ export default function WatchlistPage() {
       </div>
 
       {error && (
-        <p className="mt-4 text-sm text-zinc-400">
-          {error.includes("Not signed in") ? (
-            <>Sign in first — <Link href="/login" className="underline">login</Link>.</>
-          ) : (
-            error
-          )}
-        </p>
+        <p className="mt-4 text-sm text-zinc-400">{error}</p>
       )}
 
       {missing.length > 0 && (
