@@ -32,7 +32,9 @@ class Settings(BaseSettings):
     # Inbound webhooks (TradingView Pro alerts). Any long random string.
     webhook_secret: str = ""
 
-    # AI (LiteLLM reads provider keys from the environment)
+    # AI (LiteLLM reads provider keys from the environment, e.g. GROQ_API_KEY.
+    # Groq's free tier makes the default model $0; any litellm model id works.)
+    ai_model: str = "groq/llama-3.3-70b-versatile"
     ai_monthly_budget_usd: float = 20.0
 
     cors_origins: list[str] = ["http://localhost:3000"]

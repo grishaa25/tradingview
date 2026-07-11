@@ -82,6 +82,28 @@ Alerts are stored in `webhook_events` and forwarded to Telegram instantly.
 (Requires the backend to be reachable from the internet — fine once deployed;
 for local testing use `ngrok http 8000`.)
 
+## 8. Options chain + Nifty Impact (free, no setup)
+
+- **/options/NIFTY** — live NSE option chain (also BANKNIFTY / FINNIFTY /
+  MIDCPNIFTY or any F&O stock, e.g. `/options/RELIANCE`): OI walls, PCR,
+  max pain, ATM IV, expiry switcher. Uses NSE's own free feed (~3 min
+  delayed, cached 3 min). Every view also stores a snapshot into
+  `chain_snapshots`, so OI/IV history builds up as you use it.
+- **/impact** — which stocks moved NIFTY today, in index points per
+  constituent. Needs daily candles for the NIFTY 50 names — the standard
+  backfill from step 4 covers them.
+
+## 9. AI Assistant (~2 min, free tier)
+
+1. Create a free API key at https://console.groq.com/keys.
+2. Put it in `backend/.env` as `GROQ_API_KEY=...` (the default
+   `AI_MODEL=groq/llama-3.3-70b-versatile` runs on Groq's free tier).
+   Prefer another provider? Set any LiteLLM model id + its key, e.g.
+   `AI_MODEL=claude-haiku-4-5` + `ANTHROPIC_API_KEY`.
+3. Restart the backend and open **/assistant**. Answers are grounded in
+   your own quotes and scanner signals; spend is metered per message and
+   capped by `AI_MONTHLY_BUDGET_USD`.
+
 ## Data sources & costs
 
 | Data | Source | Cost | Notes |
@@ -89,5 +111,8 @@ for local testing use `ngrok http 8000`.)
 | Daily + hourly candles | Yahoo Finance chart API | ₹0, no key | ~15 min delayed; perfect for scanning |
 | Official daily OHLCV | NSE bhavcopy (18:30 IST) | ₹0 | overwrites Yahoo daily candles nightly |
 | F&O universe + lot sizes | NSE fo_mktlots.csv | ₹0 | static seed included as fallback |
+| Option chain (indices + stocks) | NSE option-chain API | ₹0, no key | ~3 min delayed; snapshots accumulate history |
+| NIFTY index level | Yahoo Finance (^NSEI) | ₹0, no key | drives the Impact Engine |
+| AI assistant | Groq free tier (LiteLLM) | ₹0 | or any provider key; budget-capped |
 | Charts + manual alerts | TradingView (your Pro) | already paid | embed + webhooks integrated |
 | Real-time ticks, option chain | Angel One / Dhan API | ₹0 with account | the upgrade path when you want live data |

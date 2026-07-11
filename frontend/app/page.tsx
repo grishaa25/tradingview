@@ -1,12 +1,12 @@
 import Link from "next/link";
 
 const modules = [
-  { href: "/watchlist", label: "Watchlist", phase: "P0" },
-  { href: "/charts/RELIANCE", label: "Charts", phase: "P0" },
-  { href: "/scanner", label: "Scanner", phase: "P0" },
-  { href: "/assistant", label: "AI Assistant", phase: "P0" },
-  { href: "/options/NIFTY", label: "Options", phase: "P1" },
-  { href: "/impact", label: "Nifty Impact", phase: "P1" },
+  { href: "/watchlist", label: "Watchlist", phase: "live" },
+  { href: "/charts/RELIANCE", label: "Charts", phase: "live" },
+  { href: "/scanner", label: "Scanner", phase: "live" },
+  { href: "/assistant", label: "AI Assistant", phase: "live" },
+  { href: "/options/NIFTY", label: "Options", phase: "live" },
+  { href: "/impact", label: "Nifty Impact", phase: "live" },
   { href: "/portfolio", label: "Portfolio & Risk", phase: "P2" },
   { href: "/news", label: "News", phase: "P2" },
   { href: "/backtest", label: "Backtest", phase: "P3" },
