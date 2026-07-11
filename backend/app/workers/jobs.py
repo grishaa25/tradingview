@@ -1,8 +1,11 @@
 """Scheduled job bodies (ARCHITECTURE §6). All idempotent; all log to job_runs."""
 
+import asyncio
 import json
 import logging
 from datetime import date, datetime, timedelta, timezone
+
+import httpx
 
 from sqlalchemy import text
 
@@ -74,6 +77,39 @@ async def hourly_scan_pass() -> None:
         return totals
 
     await _log_run("hourly_scan_pass", body)
+
+
+async def yahoo_intraday_refresh() -> None:
+    """:10 past each market hour: refresh recent 1D+60m candles from Yahoo
+    so the :15 scan pass sees current bars. Free/keyless data path."""
+
+    async def body(session):
+        if await _is_holiday(session, datetime.now(IST).date()):
+            return {"skipped": "holiday"}
+        from app.marketdata.ingest import yahoo
+
+        result = await session.execute(
+            text("SELECT id, ticker FROM symbols WHERE fno_flag ORDER BY ticker")
+        )
+        symbols = [dict(r) for r in result.mappings()]
+        stats = {}
+        async with httpx.AsyncClient(headers=yahoo.HEADERS, timeout=30) as client:
+            upserted = 0
+            for sym in symbols:
+                for tf, rng in (("60", "5d"), ("1D", "1mo")):
+                    try:
+                        rows = await yahoo.fetch_candles(sym["ticker"], tf, client, rng)
+                        upserted += await yahoo.upsert_candle_rows(
+                            session, sym["id"], tf, rows
+                        )
+                    except Exception:  # noqa: BLE001
+                        log.warning("yahoo refresh failed for %s %s", sym["ticker"], tf)
+                    await asyncio.sleep(0.35)
+            stats["upserted"] = upserted
+        await session.commit()
+        return stats
+
+    await _log_run("yahoo_intraday_refresh", body)
 
 
 async def liquidity_rank() -> None:

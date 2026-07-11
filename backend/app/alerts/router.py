@@ -17,6 +17,7 @@ import json
 from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy import text
 
+from app.alerts.channels.telegram import send_message
 from app.core.config import get_settings
 from app.core.deps import DbSession
 
@@ -46,4 +47,42 @@ async def tradingview_webhook(request: Request, db: DbSession, secret: str = "")
         )
     ).scalar_one()
     await db.commit()
-    return {"stored": True, "event_id": event_id}
+
+    # Forward to Telegram immediately; the stored row is the safety net if
+    # formatting/sending fails.
+    forwarded = False
+    try:
+        forwarded = await send_message(format_tradingview_alert(payload))
+        if forwarded:
+            await db.execute(
+                text("UPDATE webhook_events SET processed = true WHERE id = :id"),
+                {"id": event_id},
+            )
+            await db.commit()
+    except Exception as exc:  # noqa: BLE001 — never bounce TradingView's webhook
+        await db.execute(
+            text("UPDATE webhook_events SET error = :e WHERE id = :id"),
+            {"e": str(exc), "id": event_id},
+        )
+        await db.commit()
+
+    return {"stored": True, "event_id": event_id, "telegram_forwarded": forwarded}
+
+
+def format_tradingview_alert(payload: dict) -> str:
+    """Render a TradingView alert payload for Telegram.
+
+    Recognizes the recommended message format
+    {"ticker","side","price","time","note"}; anything else is passed
+    through raw so no alert is ever silently dropped.
+    """
+    if isinstance(payload, dict) and "ticker" in payload:
+        side = str(payload.get("side", "alert")).upper()
+        emoji = {"BUY": "🟢", "SELL": "🔴"}.get(side, "📈")
+        parts = [f"{emoji} <b>TradingView: {side} {payload['ticker']}</b>"]
+        if payload.get("price") is not None:
+            parts.append(f"price {payload['price']}")
+        if payload.get("note"):
+            parts.append(str(payload["note"]))
+        return " | ".join(parts)
+    return f"📈 <b>TradingView alert</b> | {json.dumps(payload)[:500]}"
