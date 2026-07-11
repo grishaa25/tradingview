@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 const modules = [
+  { href: "/watchlist", label: "Watchlist", phase: "P0" },
   { href: "/charts/RELIANCE", label: "Charts", phase: "P0" },
   { href: "/scanner", label: "Scanner", phase: "P0" },
   { href: "/assistant", label: "AI Assistant", phase: "P0" },

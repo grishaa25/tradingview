@@ -5,11 +5,15 @@ from sqlalchemy import text
 
 from app.core.deps import CurrentUser, DbSession
 from app.marketdata import service
-from app.marketdata.fno_seed import FNO_TICKERS
+from app.marketdata.fno_seed import FNO_TICKERS, TICKER_ALIASES
 from app.marketdata.ingest import yahoo
 from app.marketdata.ingest.bhavcopy import ingest_bhavcopy
 
 router = APIRouter()
+
+
+def _resolve_alias(ticker: str) -> str:
+    return TICKER_ALIASES.get(ticker, ticker)
 
 
 @router.get("/symbols")
@@ -20,6 +24,17 @@ async def list_symbols(
     search: str | None = None,
 ) -> list[dict]:
     return await service.list_symbols(db, fno=fno, search=search)
+
+
+@router.get("/quotes")
+async def get_quotes(
+    db: DbSession, user: CurrentUser, tickers: str, tf: str = "1D"
+) -> list[dict]:
+    """Bulk latest-close snapshot for a watchlist, e.g. ?tickers=RELIANCE,SBIN,TCS."""
+    wanted = [_resolve_alias(t.strip().upper()) for t in tickers.split(",") if t.strip()]
+    if not wanted:
+        raise HTTPException(400, "tickers query param is required")
+    return await service.get_quotes(db, wanted, tf)
 
 
 @router.get("/candles/{ticker}")
@@ -74,7 +89,7 @@ async def backfill_yahoo(
     take ≈4 min; start with a subset to see data instantly.
     """
     if tickers:
-        wanted = [t.strip().upper() for t in tickers.split(",") if t.strip()]
+        wanted = [_resolve_alias(t.strip().upper()) for t in tickers.split(",") if t.strip()]
         result = await db.execute(
             text("SELECT id, ticker FROM symbols WHERE ticker = ANY(:t)"),
             {"t": wanted},
